@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html><head><base target="_top"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Routine Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Poppins:wght@500;600&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<style>
+:root{--pink:#F4DCE5;--lav:#E8DFF5;--peach:#F9E5D5;--sage:#DCE8D5;--blue:#DCEAF5;--cream:#FFF9F2;--rose:#C58FA7;--purple:#A895C8;--sg:#93A88D;--brown:#B69A85;--ink:#5b4b4f}
+*{box-sizing:border-box}body{margin:0;font-family:Nunito,sans-serif;background:var(--cream);color:var(--ink)}
+h1,h2,h3{font-family:Quicksand,sans-serif;margin:.2em 0 .5em}
+#side{position:fixed;inset:0 auto 0 0;width:236px;background:linear-gradient(180deg,var(--pink),var(--lav));padding:18px 14px;overflow:auto;transition:transform .3s;z-index:5}
+#side h1{font-size:21px}#side small{display:block;margin-bottom:14px;color:var(--brown)}
+#side a{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:14px;cursor:pointer;margin:3px 0}
+#side a.on,#side a:hover{background:#fffa}
+main{margin-left:236px;padding:22px;max-width:1180px}
+.card{background:#fff;border-radius:20px;padding:16px;box-shadow:0 4px 14px #c58fa71f;margin-bottom:14px}
+.hero{background:linear-gradient(120deg,var(--pink),var(--peach) 60%,var(--lav))}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.stat{border-radius:18px;padding:14px;text-align:center}.stat b{font:600 26px Poppins;display:block}
+button{border:0;border-radius:12px;padding:8px 14px;background:var(--rose);color:#fff;cursor:pointer;font:inherit;transition:.2s}
+button:hover{filter:brightness(1.07)}button.ghost{background:var(--lav);color:var(--ink);padding:5px 10px}
+.tabs button{background:var(--lav);color:var(--ink);margin:0 6px 8px 0}.tabs button.on{background:var(--purple);color:#fff}
+table{width:100%;border-collapse:collapse;margin-bottom:10px}td,th{padding:8px;text-align:left;border-bottom:1px solid #f1e6ea;font-size:14px}
+.pill{padding:2px 10px;border-radius:99px;font-size:12px;color:#4a3b3f;white-space:nowrap}
+.bar{height:12px;background:var(--lav);border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--rose),var(--purple))}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}.gal img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px}
+img.th{width:36px;height:36px;object-fit:cover;border-radius:8px}
+#modal{display:none;position:fixed;inset:0;background:#4a3b3f66;z-index:20;align-items:center;justify-content:center;padding:14px}
+#modal>div{background:#fff;border-radius:22px;padding:20px;width:min(480px,100%);max-height:90vh;overflow:auto}
+label{display:block;font-size:13px;margin:8px 0 2px}input,select,textarea{width:100%;padding:8px;border:1px solid #e6d8de;border-radius:10px;font:inherit;background:var(--cream)}
+input[type=checkbox]{width:auto}#dlg{display:none;position:fixed;inset:0;background:#4a3b3f66;z-index:30;align-items:center;justify-content:center;padding:14px}#dlg>div{background:#fff;border-radius:22px;padding:20px;width:min(380px,100%);max-height:90vh;overflow:auto}#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:99px;opacity:0;transition:opacity .3s;z-index:40;pointer-events:none}.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:14px}.two .card{margin:0}
+.covers{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px}.cv img,.cv .ph{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:14px;margin-bottom:6px}
+.cv .ph{background:var(--lav);display:flex;align-items:center;justify-content:center;font-size:34px}.cv b{display:block;font-size:14px}
+.gh{display:flex;gap:8px;align-items:center}#burger{display:none;position:fixed;top:10px;left:10px;z-index:6}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+@media(max-width:800px){#side{transform:translateX(-100%)}#side.open{transform:none}main{margin:0;padding:56px 12px 20px}#burger{display:block}}
+</style></head>
+<body>
+<button id="burger" onclick="document.getElementById('side').classList.toggle('open')"><i data-lucide="menu"></i></button>
+<nav id="side"><h1>🌸 Routine Tracker</h1><small>A Little Progress Every Day.</small><div id="nav"></div></nav>
+<main id="main"><div class="card">Loading your planner...</div></main>
+<div id="dlg"></div><div id="toast"></div>
+<div id="modal"><div id="mbody"></div></div>
+<script>
+const $=s=>document.querySelector(s);
+const api=(f,...a)=>new Promise((ok,no)=>{
+  if(typeof google==='undefined'||!google.script||!google.script.run){no(new Error('No GAS runtime'));return;}
+  google.script.run.withSuccessHandler(ok).withFailureHandler(no)[f](...a);
+});
+const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const addDays=(s,n)=>{const d=new Date(s+'T00:00');d.setDate(d.getDate()+n);return iso(d)};
+const monday=s=>addDays(iso(new Date(s+'T00:00')),-((new Date(s+'T00:00').getDay()+6)%7));
+const TODAY=iso(new Date()), TDAY=DAYS[(new Date().getDay()+6)%7];
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const uid=()=>crypto.randomUUID();
+let D={},page='dashboard',tab={},week=monday(TODAY),day=TDAY,Q=[],charts=[];
+
+const IMG='img',IMGU='imgu',T='text',N='number',DT='date',TM='time',TA='area',S='sel';
+const CATS=['Skincare','Bodycare','Haircare','Oralcare','Healthcare','Homecare'];
+const ACT=['Morning Routine','Spiritual','Work','Learning','Exercise','Skincare','Bodycare','Haircare','Household','Gardening','Reading','Entertainment','Rest','Evening Routine','Sleep'];
+const PRI=['Low','Medium','High'],FREQ=['Daily','Twice daily','Weekly','Twice weekly','Monthly','Custom days','Custom interval'];
+const PST=['Wishlist','Owned','Currently Using','Unopened','Finished','Empty','Discarded'];
+const PCAT=['Vegetables','Fruits','Herbs','Ornamental plants','Flowers'];
+const E={
+Schedule:{ck:1,show:['start','end','name','category'],f:[['name','Activity',T],['start','Start',TM],['end','End',TM],['category','Category',S,ACT],['desc','Description',TA],['notes','Notes',T],['reminder','Reminder',TM]]},
+Todos:{ck:1,show:['title','priority','deadline'],f:[['title','Task',T],['date','Date',DT],['priority','Priority',S,PRI],['deadline','Deadline',DT],['category','Category',S,ACT],['notes','Notes',TA]]},
+Care:{ck:1,show:['order','step','product','frequency'],f:[['category','Category',S,CATS],['step','Step name',T],['product','Product used',T],['order','Order',N],['frequency','Frequency',S,FREQ],['duration','Minutes',N],['reminder','Reminder',TM],['desc','Description',TA]]},
+Wishlist:{show:['name','brand','price','priority','status'],f:[['name','Product',T],['category','Category',S,CATS],['brand','Brand',T],['price','Estimated price',N],['priority','Priority',S,PRI],['reason','Reason',TA],['image','Image URL',T],['status','Status',S,['Wanted','Purchased']]],
+  x:r=>`<button class=ghost onclick="toShop('${r.id}')">to Shopping</button>`,xl:''},
+Products:{show:['name','brand','category','status'],f:[['name','Product',T],['brand','Brand',T],['category','Category',S,CATS],['image','Image URL',T],['purchaseDate','Purchase date',DT],['price','Price',N],['expiry','Printed expiry',DT],['pao','PAO (e.g. 12M)',T],['openDate','Opening date',DT],['qty','Quantity',N],['location','Storage location',T],['status','Status',S,PST],['notes','Notes',TA]],
+  x:r=>{const[a,c,e]=exp(r);return `<span class=pill style="background:${c}">${a}</span> <small>${e}</small>`},xl:'Expiry'},
+Vitamins:{ck:'v',show:['name','dosage','time','frequency'],f:[['name','Vitamin / supplement',T],['dosage','Dosage (as on label/prescription)',T],['time','Time',TM],['frequency','Frequency',S,FREQ],['start','Start',DT],['end','End (optional)',DT],['notes','Notes',TA]]},
+Exercise:{ck:1,show:['date','name','category','duration'],f:[['name','Exercise',T],['category','Category',S,['Walking','Stretching','Yoga','Cycling','Strength training','Dancing','Other']],['date','Date',DT],['start','Start',TM],['duration','Minutes',N],['desc','Description',TA],['notes','Notes',T]]},
+Plants:{show:['image','name','category','plantDate','polybag','status'],f:[['name','Plant name',T],['common','Common name',T],['category','Category',S,PCAT],['sci','Scientific name',T],['source','Seed source',T],['image','Photo',IMG],['sowDate','Sowing date',DT],['plantDate','Planting date',DT],['location','Location',T],['polybag','Polybag size',S,['15 x 15 cm','20 x 20 cm','25 x 25 cm','30 x 30 cm','Custom']],['medium','Growing medium',T],['status','Status',S,['Seed preparation','Sowing','Germination','Seedling','Transplanting','Vegetative','Flowering','Fruiting','Harvested']],['notes','Notes',TA]]},
+Fertilizing:{ck:1,show:['plant','fertilizer','date','next'],f:[['plant','Plant',T],['fertilizer','Fertilizer',T],['type','Type',S,['Organic','Chemical','Liquid','Other']],['date','Applied on',DT],['next','Next date',DT],['notes','Notes',TA]]},
+Watering:{ck:1,show:['plant','date','frequency'],f:[['plant','Plant',T],['date','Date',DT],['frequency','Frequency',T],['notes','Notes',TA]]},
+Growth:{show:['date','plant','stage','height'],f:[['plant','Plant',T],['date','Date',DT],['stage','Stage',T],['height','Height (cm)',N],['image','Photo',IMG],['notes','Notes',TA]],
+  x:r=>r.image?`<img class=th src="${esc(r.image)}">`:'',xl:'Photo'},
+Stationery:{show:['name','brand','category','qty','status'],f:[['name','Item',T],['brand','Brand',T],['category','Category',T],['qty','Quantity',N],['color','Color',T],['price','Price',N],['status','Status',S,['Owned','In use','Wishlist','Finished']],['notes','Notes',TA]]},
+Reading:{show:['image','title','type','status','progress','rating'],f:[['title','Title',T],['type','Type',S,['Book','Drama','Webtoon']],['author','Author / Director',T],['status','Status',S,['Planned','Reading','Watching','Finished','Dropped']],['progress','Progress (%)',N],['rating','Rating (1-5)',N],['notes','Notes',TA],['image','Cover (image URL)',IMGU]]},
+Shopping:{ck:1,show:['item','category','qty','price','priority'],f:[['item','Item',T],['category','Category',T],['qty','Quantity',N],['price','Price',N],['priority','Priority',S,PRI]]}
+};
+const lab=(n,k)=>(E[n].f.find(x=>x[0]===k)||[,k])[1];
+const isDone=(n,r)=>n==='Care'?r.done===TODAY:E[n].ck==='v'?(r.doneDates||'').split(',').includes(TODAY):r.done==='1';
+
+function effExp(p){const c=[];if(p.expiry)c.push(new Date(p.expiry+'T00:00'));const m=/(\d+)/.exec(p.pao||'');
+ if(p.openDate&&m){const d=new Date(p.openDate+'T00:00');d.setMonth(d.getMonth()+ +m[1]);c.push(d)}return c.length?new Date(Math.min(...c)):null}
+function exp(p){const e=effExp(p);if(!e)return['No date','#eee',''];const d=Math.ceil((e-new Date())/864e5),t=iso(e);
+ return d<0?['Expired','#e9a0a0',t]:d<=7?['7 days','#f2b49a',t]:d<=30?['30 days','#f5d9a0',t]:d<=60?['60 days','#d7e6b8',t]:['Safe','#bcd4b4',t]}
+
+function cell(n,r,k){const v=r[k];if(k==='image'&&v)return `<img class=th referrerpolicy="no-referrer" src="${esc(v)}">`;
+ if(k==='priority')return `<span class=pill style="background:${{High:'#f2b4c4',Medium:'#f9e5d5',Low:'#dce8d5'}[v]||'#eee'}">${esc(v)}</span>`;return esc(v)}
+function tbl(n,rows,def){const e=E[n];
+ const b=rows.map(r=>`<tr>${e.ck?`<td><input type=checkbox ${isDone(n,r)?'checked':''} onchange="tog('${n}','${r.id}')"></td>`:''}${e.show.map(k=>`<td>${cell(n,r,k)}</td>`).join('')}${e.x?`<td>${e.x(r)}</td>`:''}<td style="white-space:nowrap"><button class=ghost onclick="edit('${n}','${r.id}')">Edit</button> <button class=ghost onclick="del('${n}','${r.id}')">Delete</button></td></tr>`).join('');
+ return `<div style="overflow-x:auto"><table><tr>${e.ck?'<th></th>':''}${e.show.map(k=>`<th>${lab(n,k)}</th>`).join('')}${e.x?`<th>${e.xl}</th>`:''}<th></th></tr>${b||'<tr><td colspan=9>Nothing here yet. Add your first entry.</td></tr>'}</table></div><button onclick='add("${n}",${JSON.stringify(def||{})})'>Add entry</button>`}
+function form(n,o){return `<h3>${o.id?'Edit':'New'} entry</h3>`+E[n].f.map(([k,l,t,opt])=>{const v=esc(o[k]);
+ return `<label>${l}</label>`+(t===IMGU?imgUrlField(k,o[k]):t===IMG?imgField(k,o[k]):t===S?`<select id="f_${k}"><option></option>${opt.map(x=>`<option ${x===o[k]?'selected':''}>${x}</option>`).join('')}</select>`:t===TA?`<textarea id="f_${k}" rows=3>${v}</textarea>`:`<input id="f_${k}" type="${t===N?'number':t===DT?'date':t===TM?'time':'text'}" value="${v}">`)}).join('')+
+ `<div class=row style="margin-top:14px"><button onclick="submitForm('${n}')">Save</button><button class=ghost onclick="closeM()">Cancel</button></div>`}
+const imgTag=v=>v?`<img class=th style="width:90px;height:90px" referrerpolicy="no-referrer" src="${esc(v)}">`:'';
+const fixUrl=u=>{u=(u||'').trim();const m=/drive\.google\.com\/file\/d\/([^/?]+)/.exec(u)||/drive\.google\.com\/open\?id=([^&]+)/.exec(u);return m?'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w800':u};
+const imgUrlField=(k,v)=>`<input id="f_${k}" type=text placeholder="https://..." value="${esc(v)}" oninput="document.getElementById('pv_${k}').innerHTML=imgTag(fixUrl(this.value))"><small>Paste an image link.</small><div id="pv_${k}">${imgTag(v)}</div><small>Or upload a file:</small> <input type=file accept="image/*" onchange="upImg(this,'${k}')"><small id="st_${k}"></small>`;
+const imgField=(k,v)=>`<input type=hidden id="f_${k}" value="${esc(v)}"><div id="pv_${k}">${imgTag(v)}</div><input type=file accept="image/*" onchange="upImg(this,'${k}')"><small id="st_${k}"></small>`;
+const shrink=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const s=Math.min(1,1000/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.8))};i.onerror=no;i.src=r.result};r.onerror=no;r.readAsDataURL(f)});
+async function upImg(inp,k){const f=inp.files[0];if(!f)return;const st=document.getElementById('st_'+k);st.textContent='Uploading...';
+ try{const link=await api('uploadImage',await shrink(f),'plant');document.getElementById('f_'+k).value=link;document.getElementById('pv_'+k).innerHTML=imgTag(link);st.textContent='Uploaded'}catch(e){st.textContent='Failed'}}
+function dlg(h){return new Promise(ok=>{const d=document.getElementById('dlg');d.innerHTML='<div>'+h+'</div>';d.style.display='flex';window._dk=v=>{d.style.display='none';ok(v)}})}
+const ask=m=>dlg(`<p>${esc(m)}</p><div class=row><button onclick="_dk(true)">OK</button><button class=ghost onclick="_dk(false)">Cancel</button></div>`);
+const askText=m=>dlg(`<p>${esc(m)}</p><input id=dtx><div class=row style="margin-top:12px"><button onclick="_dk(document.getElementById('dtx').value)">Save</button><button class=ghost onclick="_dk(null)">Cancel</button></div>`);
+const choose=(t,o)=>dlg(`<h3>${esc(t)}</h3>${o.map(([k,l])=>`<button class=ghost style="display:block;width:100%;margin:6px 0;text-align:left" onclick="_dk('${k}')">${esc(l)}</button>`).join('')}<button style="margin-top:8px" onclick="_dk(null)">Cancel</button>`);
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;setTimeout(()=>t.style.opacity=0,2200)}
+let CUR={};
+function add(n,def){CUR={...def};document.getElementById('mbody').innerHTML=form(n,CUR);document.getElementById('modal').style.display='flex'}
+function edit(n,id){CUR={...D[n].find(r=>r.id===id)};document.getElementById('mbody').innerHTML=form(n,CUR);document.getElementById('modal').style.display='flex'}
+function closeM(){document.getElementById('modal').style.display='none'}
+async function submitForm(n){const o={...CUR};E[n].f.forEach(([k])=>{const v=document.getElementById('f_'+k).value.trim();o[k]=k==='image'?fixUrl(v):v});await put(n,o);closeM();render()}
+function put(n,o){if(!o.id)o.id=uid();const i=D[n].findIndex(r=>r.id===o.id);i<0?D[n].push(o):D[n][i]=o;api('save',n,o).catch(e=>toast('Saved locally'));return Promise.resolve(o)}
+async function del(n,id){if(!await ask('Delete this entry?'))return;D[n]=D[n].filter(r=>r.id!==id);render();api('remove',n,id).catch(e=>toast('Deleted locally'))}
+async function tog(n,id){const r={...D[n].find(x=>x.id===id)};
+ if(E[n].ck==='v'){const s=new Set((r.doneDates||'').split(',').filter(Boolean));s.has(TODAY)?s.delete(TODAY):s.add(TODAY);r.doneDates=[...s].join(',')}else if(n==='Care')r.done=r.done===TODAY?'':TODAY;else r.done=r.done==='1'?'':'1';
+ await put(n,r);render()}
+async function toShop(id){const w=D.Wishlist.find(r=>r.id===id);await put('Shopping',{item:w.name,category:w.category,qty:1,price:w.price,priority:w.priority});toast('Added to Shopping List')}
+const tabs=(k,names)=>{tab[k]=tab[k]||names[0];return `<div class=tabs>${names.map(x=>`<button class="${x===tab[k]?'on':''}" onclick="tab['${k}']='${x}';render()">${x}</button>`).join('')}</div>`};
+const stat=(v,l,c)=>`<div class=stat style="background:var(--${c})"><b>${v}</b>${l}</div>`;
+const pct=(a,b)=>b?Math.round(a*100/b):0;
+function chart(id,type,labels,data,colors){Q.push(()=>{const c=document.getElementById(id);if(c)if(window.Chart)charts.push(new Chart(c,{type,data:{labels,datasets:[{data,backgroundColor:colors||['#F4DCE5','#E8DFF5','#F9E5D5','#DCE8D5','#DCEAF5','#C58FA7'],borderRadius:8}]},options:{plugins:{legend:{display:type==='doughnut'}},scales:type==='bar'?{y:{beginAtZero:true,ticks:{precision:0}}}:{}}}))})}
+
+const QUOTES=['A little progress every day adds up.','Slow growth is still growth.','Be gentle with yourself today.','Small habits, soft life.','Bloom at your own pace.'];
+function todayItems(){
+ const now=new Date().toTimeString().slice(0,5),I=[],wk=monday(TODAY);
+ const P=(g,n,r,time,label,sub,late)=>I.push({g,n,r,time:time||'99:99',label,sub,late:!!late&&!isDone(n,r)});
+ (D.Schedule||[]).filter(r=>r.week===wk&&r.day===TDAY).forEach(r=>P('Routine','Schedule',r,r.start,r.name,[r.start&&r.end?r.start+'-'+r.end:'',r.category].filter(Boolean).join(' · '),r.end&&r.end<now));
+ (D.Care||[]).filter(r=>['Daily','Twice daily'].includes(r.frequency)).forEach(r=>P('Routine','Care',r,r.reminder,r.step,r.category+' care'+(r.product?' · '+r.product:''),false));
+ (D.Todos||[]).filter(t=>t.date===TODAY||t.deadline===TODAY||(t.deadline&&t.deadline<TODAY&&t.done!=='1')).forEach(t=>P('To-do','Todos',t,'',t.title,[t.priority,t.deadline&&'due '+t.deadline].filter(Boolean).join(' · '),t.deadline&&t.deadline<TODAY));
+ (D.Vitamins||[]).filter(v=>(!v.start||v.start<=TODAY)&&(!v.end||v.end>=TODAY)).forEach(v=>P('Vitamins','Vitamins',v,v.time,v.name,[v.dosage,v.time].filter(Boolean).join(' · '),false));
+ (D.Exercise||[]).filter(e=>e.date===TODAY).forEach(e=>P('Workout','Exercise',e,e.start,e.name,[e.category,e.duration&&e.duration+' min'].filter(Boolean).join(' · '),false));
+ (D.Watering||[]).filter(w=>w.date===TODAY||(w.date&&w.date<TODAY&&w.done!=='1')).forEach(w=>P('Gardening','Watering',w,'','Water '+w.plant,w.date<TODAY?'since '+w.date:'',w.date<TODAY));
+ (D.Fertilizing||[]).filter(f=>{const d=f.next||f.date;return d===TODAY||(d&&d<TODAY&&f.done!=='1')}).forEach(f=>P('Gardening','Fertilizing',f,'','Fertilize '+f.plant,f.fertilizer,(f.next||f.date)<TODAY));
+ I.forEach(i=>{if(i.g==='Gardening'){const nm=i.label.slice(i.label.indexOf(' ')+1).toLowerCase(),pl=(D.Plants||[]).find(x=>x.image&&(x.name||'').toLowerCase()===nm);if(pl)i.img=pl.image}});
+ return I}
+function dashboard(){
+ const I=todayItems(),done=I.filter(i=>isDone(i.n,i.r)).length,p=pct(done,I.length);
+ const h=new Date().getHours(),g=h<11?'Good morning':h<15?'Good afternoon':h<18?'Good evening':'Good night';
+ const q=(D.Settings||[]).find(s=>s.id==='quote')?.value||QUOTES[0];
+ const using=(D.Products||[]).filter(p=>p.status==='Currently Using').length,soon=(D.Products||[]).filter(p=>['Expired','7 days','30 days','60 days'].includes(exp(p)[0])&&!['Finished','Empty','Discarded'].includes(p.status)).length;
+ chart('dn','doughnut',['Done','Remaining'],[done,I.length-done],['#C58FA7','#E8DFF5']);
+ const G=[['Routine','heart','pink','Routine'],['To-do','list-checks','peach','To-do list'],['Vitamins','pill','lav','Vitamin schedule'],['Workout','dumbbell','sage','Workout today'],['Gardening','sprout','blue','Gardening']];
+ const grp=([g,ic,c,t])=>{const x=I.filter(i=>i.g===g).sort((a,b)=>a.time>b.time?1:-1);
+  return `<div class=card style="border-top:6px solid var(--${c})"><h3 class=gh><i data-lucide="${ic}"></i>${t}</h3><table>${x.map(i=>{const d=isDone(i.n,i.r);return `<tr><td style="width:28px"><input type=checkbox ${d?'checked':''} onchange="tog('${i.n}','${i.r.id}')"></td>${i.img?`<td style="width:44px"><img class=th src="${esc(i.img)}"></td>`:''}<td>${i.time!=='99:99'?`<b>${i.time}</b> `:''}${esc(i.label)}<br><small>${esc(i.sub)}</small></td><td style="text-align:right"><span class=pill style="background:${d?'#d7e6b8':i.late?'#f2b49a':'#f1e6ea'}">${d?'Done':i.late?'Overdue':'Pending'}</span></td></tr>`}).join('')||'<tr><td>Nothing planned here today.</td></tr>'}</table>${g==='To-do'?`<button onclick='add("Todos",{date:"${TODAY}"})'>Add task</button>`:g==='Workout'?`<button onclick='add("Exercise",{date:"${TODAY}"})'>Add workout</button>`:''}</div>`};
+ const ico={Book:'📖',Drama:'📺',Webtoon:'🖍️'},now=(D.Reading||[]).filter(r=>['Reading','Watching'].includes(r.status));
+ const snap=(D.Growth||[]).filter(g=>g.image).sort((a,b)=>b.date>a.date?1:-1).slice(0,6);
+ return `<div class="card hero"><h1>${g} ✿</h1><div>${TDAY}, ${TODAY} · week of ${monday(TODAY)}</div><p><i>${esc(q)}</i></p><button class=ghost onclick="newQuote()">Change quote</button></div>
+ <div class=grid>${stat(p+'%','Daily completion','pink')}${stat((D.Care||[]).length,'Care steps','lav')}${stat(using,'Products in use','peach')}${stat(soon,'Expiring / expired','blue')}${stat((D.Plants||[]).filter(x=>x.status!=='Harvested').length,'Active plants','sage')}${stat((D.Reading||[]).filter(x=>x.type==='Book'&&x.status==='Reading').length,'Books reading','pink')}${stat((D.Reading||[]).filter(x=>x.type==='Drama'&&x.status==='Watching').length,'Dramas watching','lav')}${stat((D.Shopping||[]).filter(x=>x.done!=='1').length,'Shopping items','peach')}</div>
+ <div class=card><h3>Today's progress</h3><div class=row><div style="width:150px"><canvas id=dn></canvas></div><div style="flex:1;min-width:200px">${done} of ${I.length} done, ${I.length-done} remaining<div class=bar><i style="width:${p}%"></i></div></div></div></div>
+ <div class=card><h3>Currently reading & watching</h3><div class=covers>${now.map(r=>`<div class=cv>${r.image?`<img referrerpolicy="no-referrer" src="${esc(r.image)}" onerror="this.outerHTML='<div class=ph>${ico[r.type]||'📚'}</div>'">`:`<div class=ph>${ico[r.type]||'📚'}</div>`}<b>${esc(r.title)}</b><small>${esc(r.type)}${r.progress?' · '+esc(r.progress)+'%':''}</small><div class=bar><i style="width:${Math.min(100,+r.progress||0)}%"></i></div></div>`).join('')||'<p>Nothing in progress yet.</p>'}</div></div>
+ <div class=two>${G.map(grp).join('')}</div>
+ ${snap.length?`<div class=card><h3>Garden snapshots</h3><div class=gal>${snap.map(g=>`<div><img src="${esc(g.image)}"><small>${esc(g.plant)}</small></div>`).join('')}</div></div>`:''}`}
+async function newQuote(){const q=QUOTES.concat((D.Settings||[]).filter(s=>s.id.startsWith('q_')).map(s=>s.value));await put('Settings',{id:'quote',value:q[Math.floor(Math.random()*q.length)]});render()}
+
+function schedule(){
+ const rows=(D.Schedule||[]).filter(r=>r.week===week),wk=(D.Weeks||[]).find(w=>w.week===week)||{week},dr=rows.filter(r=>r.day===day).sort((a,b)=>a.start>b.start?1:-1);
+ const weeks=[...new Set([week,...(D.Schedule||[]).map(r=>r.week)])].sort().reverse(),dt=addDays(week,DAYS.indexOf(day));
+ const per=DAYS.map(d=>{const x=rows.filter(r=>r.day===d);return[d,x.length,x.filter(r=>r.done==='1').length]});
+ const withData=per.filter(x=>x[1]),best=[...withData].sort((a,b)=>b[2]/b[1]-a[2]/a[1]),rv=JSON.parse(wk.review||'{}');
+ const Qs=['What went well this week?','What did I learn?','What activities made me happy?','What should I improve next week?','What new activities would I like to try?'];
+ return `<div class=card><h2>Weekly Schedule ${wk.archived==='1'?'(archived)':''}</h2><div class=row><select style="width:auto" onchange="week=this.value;render()">${weeks.map(w=>`<option ${w===week?'selected':''}>${w}</option>`).join('')}</select>
+ <input type=date style="width:auto" value="${week}" onchange="week=monday(this.value);render()"><button onclick="newWeek()">NEW WEEK</button><button class=ghost onclick="saveTpl()">Save template</button><button class=ghost onclick="archive()">Archive week</button></div></div>
+ <div class=tabs>${DAYS.map(d=>`<button class="${d===day?'on':''}" onclick="day='${d}';render()">${d.slice(0,3)}</button>`).join('')}</div>
+ <div class=card><h3>${day} · ${dt}</h3>${tbl('Schedule',dr,{week,day})}</div>
+ <div class=card><h3>To-do for ${dt}</h3>${tbl('Todos',(D.Todos||[]).filter(t=>t.date===dt),{date:dt})}</div>
+ <div class=card><h3>Weekly review</h3><p>${rows.length} scheduled · ${rows.filter(r=>r.done==='1').length} completed (${pct(rows.filter(r=>r.done==='1').length,rows.length)}%)</p>
+ ${Qs.map((q,i)=>`<label>${q}</label><textarea id="rv${i}" rows=2>${esc(rv[i]||'')}</textarea>`).join('')}<br><button onclick="saveReview()">Save review</button></div>`}
+async function saveReview(){const wk=(D.Weeks||[]).find(w=>w.week===week)||{week};wk.review=JSON.stringify([0,1,2,3,4].map(i=>document.getElementById('rv'+i).value));await put('Weeks',wk);toast('Review saved')}
+async function archive(){const wk=(D.Weeks||[]).find(w=>w.week===week)||{week};wk.archived=wk.archived==='1'?'':'1';await put('Weeks',wk);render()}
+const SUG=[['Morning prayer','Spiritual'],['Work','Work'],['Learning session','Learning'],['Stretching','Exercise'],['Gardening','Gardening'],['Skincare','Skincare'],['Reading','Reading'],['Evening reflection','Evening Routine']];
+async function newWeek(){const target=addDays(week,7);
+ const c=await choose('NEW WEEK for '+target,[['1','Blank schedule'],['2','Duplicate this week'],['3','Use saved template'],['4','Random suggestions']]);if(!c)return;
+ let rows=[];
+ if(c==='2')rows=(D.Schedule||[]).filter(r=>r.week===week).map(r=>({...r,id:uid(),week:target,done:''}));
+ if(c==='3'){const t=await pickTpl();if(!t)return;rows=JSON.parse(t.data).map(r=>({...r,id:uid(),week:target,done:''}))}
+ if(c==='4')DAYS.forEach(d=>[0,1,2].forEach(i=>{const s=SUG[Math.floor(Math.random()*SUG.length)];rows.push({id:uid(),week:target,day:d,name:s[0],category:s[1],start:['07:00','13:00','19:00'][i],end:['08:00','14:00','20:00'][i],done:''})}));
+ if(rows.length){await api('saveMany','Schedule',rows);D.Schedule=(D.Schedule||[]).concat(rows)}week=target;render()}
+async function pickTpl(){if(!(D.Templates||[]).length){toast('No templates yet.');return}
+ const id=await choose('Choose template',D.Templates.map(t=>[t.id,t.name]));return D.Templates.find(t=>t.id===id)}
+async function saveTpl(){const n=await askText('Template name');if(!n)return;
+ const d=(D.Schedule||[]).filter(r=>r.week===week).map(({id,week,done,...r})=>r);await put('Templates',{name:n,data:JSON.stringify(d)});toast('Template saved')}
+
+function care(){const c=tab.care||CATS[0];let h=`<h2>Routine Care</h2>${tabs('care',CATS)}`;const cc=tab.care;
+ h+=`<div class=card><h3>${cc} routine steps</h3>${tbl('Care',(D.Care||[]).filter(r=>r.category===cc).sort((a,b)=>a.order-b.order),{category:cc})}</div>`;
+ if(cc==='Healthcare'){h+=`<div class=card><h3>Vitamin schedule</h3>${tbl('Vitamins',D.Vitamins||[])}</div><div class=card><h3>Exercise tracker</h3>${tbl('Exercise',(D.Exercise||[]).sort((a,b)=>b.date>a.date?1:-1),{date:TODAY})}</div>`}
+ return h+`<div class=card><h3>${cc} wishlist</h3>${tbl('Wishlist',(D.Wishlist||[]).filter(r=>r.category===cc),{category:cc,status:'Wanted'})}</div>`}
+function product(){const P=D.Products||[],by=k=>CATS.map(c=>P.filter(p=>p[k]===c).length);
+ chart('pc','doughnut',CATS,by('category'));chart('ps','bar',PST,PST.map(s=>P.filter(p=>p.status===s).length));
+ return `<h2>Routine Product</h2><div class=grid>${stat(P.length,'Total','pink')}${stat(P.filter(p=>p.status==='Currently Using').length,'In use','lav')}${stat(P.filter(p=>['7 days','30 days','60 days'].includes(exp(p)[0])).length,'Expiring','blue')}${stat(P.filter(p=>exp(p)[0]==='Expired').length,'Expired','pink')}</div>
+ <div class=card><h3>Inventory</h3>${tbl('Products',P)}</div>
+ <div class=grid><div class=card><canvas id=pc></canvas></div><div class=card><canvas id=ps></canvas></div></div>`}
+function garden(){return `<h2>Gardening Journal</h2>${tabs('garden',['Plants','Fertilizing','Watering','Growth'])}<div class=card>${tbl({Plants:'Plants',Fertilizing:'Fertilizing',Watering:'Watering',Growth:'Growth'}[tab.garden],D[tab.garden]||[])}</div>`}
+const stationery=()=>`<h2>Stationery Collection</h2><div class=card>${tbl('Stationery',D.Stationery||[])}</div>`;
+function reading(){const t=tabs('read',['Book','Drama','Webtoon']);return `<h2>Reading & Watching</h2>${t}<div class=card>${tbl('Reading',(D.Reading||[]).filter(r=>r.type===tab.read),{type:tab.read})}</div>`}
+const shopping=()=>`<h2>Shopping List</h2><div class=card>${tbl('Shopping',D.Shopping||[])}</div>`;
+function stats(){return `<h2>Statistics & Reports</h2><p>Week of ${week}</p>`}
+function settings(){return `<div class=card><h2>Settings</h2><p>Data lives in your Google Sheet.</p></div>`}
+
+const NAV=[['dashboard','Dashboard','layout-dashboard'],['schedule','Weekly Schedule','calendar-days'],['care','Routine Care','heart'],['product','Routine Product','package'],['garden','Gardening Journal','sprout'],['stationery','Stationery Collection','pencil'],['reading','Reading & Watching','book-open'],['shopping','Shopping List','shopping-bag'],['stats','Statistics','bar-chart-3'],['settings','Settings','settings']];
+const PG={dashboard,schedule,care,product,garden,stationery,reading,shopping,stats,settings};
+function render(){charts.forEach(c=>c.destroy());charts=[];Q=[];
+ document.getElementById('nav').innerHTML=NAV.map(n=>`<a class="${n[0]===page?'on':''}" onclick="page='${n[0]}';document.getElementById('side').classList.remove('open');render()"><i data-lucide="${n[2]}"></i>${n[1]}</a>`).join('');
+ document.getElementById('main').innerHTML=PG[page]();Q.forEach(f=>f());if(window.lucide)lucide.createIcons();window.scrollTo(0,0)}
+
+const KEYS=['Schedule','Todos','Weeks','Templates','Care','Wishlist','Products','Vitamins','Exercise','Plants','Fertilizing','Watering','Growth','Stationery','Reading','Shopping','Settings'];
+const fill=()=>KEYS.forEach(k=>D[k]=D[k]||[]);
+
+// Instant fallback mock data if Google backend fails or takes too long
+function loadMockData(){
+  D = {
+    Schedule: [{id:'1',week:monday(TODAY),day:TDAY,name:'Morning Yoga',start:'07:00',end:'07:30',category:'Exercise',done:''}],
+    Todos: [{id:'1',date:TODAY,title:'Check plants & water',priority:'High',done:''}],
+    Care: [{id:'1',category:'Skincare',step:'Hydration',product:'Moisturizer',order:1,frequency:'Daily'}],
+    Products: [{id:'1',name:'Vitamin C Serum',brand:'Brand',category:'Skincare',status:'Currently Using',price:150000}],
+    Plants: [{id:'1',name:'Monstera',category:'Ornamental plants',status:'Vegetative'}],
+    Reading: [{id:'1',title:'Atomic Habits',type:'Book',status:'Reading',progress:45}],
+    Shopping: [{id:'1',item:'Plant fertilizer',category:'Gardening',qty:1,price:50000,priority:'Medium'}],
+    Settings: [{id:'quote',value:'A little progress every day adds up.'}]
+  };
+  fill();
+  render();
+  toast('Loaded in demo/offline mode.');
+}
+
+async function init(){
+  let loaded = false;
+  // Try loading from Google backend with a 3-second timeout
+  const timeoutId = setTimeout(() => {
+    if(!loaded) {
+      loadMockData();
+    }
+  }, 3000);
+
+  try {
+    const data = await api('loadAll');
+    if(data) {
+      loaded = true;
+      clearTimeout(timeoutId);
+      D = data;
+      fill();
+      render();
+    }
+  } catch(e) {
+    if(!loaded) {
+      loaded = true;
+      clearTimeout(timeoutId);
+      loadMockData();
+    }
+  }
+}
+init();
+</script></body></html>
